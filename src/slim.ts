@@ -10,6 +10,15 @@ import { type CheerioAPI, getLoad } from './load.js';
 import type { CheerioOptions } from './options.js';
 import { getParse } from './parse.js';
 
+export type {
+  CrossDocumentStrategy,
+  ModificationPlanOptions,
+  PlanCommand,
+  PlanNodeInput,
+  PlanNodeResult,
+  PlanResult,
+} from './api/plan.js';
+export { createPlan, ModificationPlan } from './api/plan.js';
 export type { Cheerio } from './cheerio.js';
 export type {
   AnyNode,

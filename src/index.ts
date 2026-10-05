@@ -3,6 +3,15 @@
  *   convenience methods for loading documents from various sources.
  */
 
+export type {
+  CrossDocumentStrategy,
+  ModificationPlanOptions,
+  PlanCommand,
+  PlanNodeInput,
+  PlanNodeResult,
+  PlanResult,
+} from './api/plan.js';
+export { createPlan, ModificationPlan } from './api/plan.js';
 export * from './load-parse.js';
 export type {
   AnyNode,
