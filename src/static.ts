@@ -312,3 +312,15 @@ function isArrayLike(item: unknown): item is ArrayLike<unknown> {
   }
   return true;
 }
+
+export type {
+  CrossDocumentPolicy,
+  ModificationPlan,
+  PlanFailure,
+  PlanNodeResult,
+  PlanOptions,
+  PlanResult,
+  PlanSuccess,
+  PlanTarget,
+} from './api/plan.js';
+export { plan } from './api/plan.js';

@@ -19,7 +19,17 @@ export type {
   ParentNode,
 } from './load.js';
 export type { CheerioOptions, HTMLParser2Options } from './options.js';
-export { contains, merge } from './static.js';
+export type {
+  CrossDocumentPolicy,
+  ModificationPlan,
+  PlanFailure,
+  PlanNodeResult,
+  PlanOptions,
+  PlanResult,
+  PlanSuccess,
+  PlanTarget,
+} from './static.js';
+export { contains, merge, plan } from './static.js';
 export type * from './types.js';
 
 /**

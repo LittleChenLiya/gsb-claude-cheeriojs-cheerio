@@ -14,7 +14,17 @@ export type {
   HTMLParser2Options,
   ParentNode,
 } from './slim.js';
-export { contains, merge } from './static.js';
+export type {
+  CrossDocumentPolicy,
+  ModificationPlan,
+  PlanFailure,
+  PlanNodeResult,
+  PlanOptions,
+  PlanResult,
+  PlanSuccess,
+  PlanTarget,
+} from './static.js';
+export { contains, merge, plan } from './static.js';
 export type * from './types.js';
 
 import { finished, Writable } from 'node:stream';
