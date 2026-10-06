@@ -1,3 +1,5 @@
+export type { FragmentReceipt } from './fragment.js';
+export { insertFragment } from './fragment.js';
 export * from './load-parse.js';
 export type {
   AnyNode,

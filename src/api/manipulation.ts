@@ -16,6 +16,7 @@ import {
 } from 'domhandler';
 import { removeElement } from 'domutils';
 import type { Cheerio } from '../cheerio.js';
+import { type FragmentReceipt, insertFragmentWithParser } from '../fragment.js';
 import { update as updateDOM } from '../parse.js';
 import { text as staticText } from '../static.js';
 import type { AcceptedElems, BasicAcceptedElems } from '../types.js';
@@ -275,6 +276,74 @@ export const append: <T extends AnyNode>(
 ) => Cheerio<T> = _insert((dom, children, parent) => {
   uniqueSplice(children, children.length, 0, dom, parent);
 });
+
+/**
+ * Append a fragment to each of the selected elements, parsing the fragment
+ * with the element itself as the parse context.
+ *
+ * Unlike {@link append}, which parses markup without any context and then
+ * attaches the resulting nodes, this method uses the real parse context of
+ * each target element. Table sections, selects and SVG subtrees therefore
+ * behave the way the HTML parser would in a browser, and HTML and SVG
+ * namespaces are preserved. Scripts are never executed and no browser events
+ * are simulated.
+ *
+ * Before anything is modified, each target is checked:
+ *
+ * - Node ownership: the target must belong to this instance's document.
+ * - Insertion validity: every element of the fragment must survive the
+ *   target's parse context.
+ *
+ * Targets that fail a check are left untouched -- no partial tree is ever
+ * inserted -- and simply produce no receipt.
+ *
+ * @category Manipulation
+ * @example Three targets: table, select and SVG.
+ *
+ * ```js
+ * const $ = cheerio.load(
+ *   '<table><tbody></tbody></table><select></select><svg></svg>',
+ * );
+ *
+ * // Table: `<tr>` becomes a real row of the tbody.
+ * $('tbody').appendFragment('<tr><td>Apple</td></tr>');
+ *
+ * // Select: `<option>` is inserted as an option of the select.
+ * $('select').appendFragment('<option value="1">One</option>');
+ *
+ * // SVG: the circle keeps the SVG namespace.
+ * $('svg').appendFragment('<circle r="1"/>');
+ * ```
+ *
+ * @param fragment - The markup to parse and insert.
+ * @returns One receipt per modified element, reporting where the nodes
+ *   actually landed; elements that rejected the fragment produce no receipt.
+ * @see {@link insertFragment} for the node-directed variant.
+ */
+export function appendFragment<T extends AnyNode>(
+  this: Cheerio<T>,
+  fragment: string,
+): FragmentReceipt[] {
+  const receipts: FragmentReceipt[] = [];
+  const root = this._root?.[0] ?? null;
+
+  for (let i = 0; i < this.length; i++) {
+    const receipt = insertFragmentWithParser(
+      (content, options, isDocument, context) =>
+        this._parse(content, options, isDocument, context),
+      this[i],
+      fragment,
+      this.options,
+      root,
+    );
+
+    if (receipt) {
+      receipts.push(receipt);
+    }
+  }
+
+  return receipts;
+}
 
 /**
  * Inserts content as the _first_ child of each of the selected elements.
