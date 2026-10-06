@@ -3,6 +3,12 @@
  *   convenience methods for loading documents from various sources.
  */
 
+export type {
+  FragmentCorrection,
+  FragmentParser,
+  FragmentReceipt,
+  FragmentRejectionReason,
+} from './fragment.js';
 export * from './load-parse.js';
 export type {
   AnyNode,

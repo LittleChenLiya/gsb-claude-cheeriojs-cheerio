@@ -16,6 +16,7 @@ import {
 } from 'domhandler';
 import { removeElement } from 'domutils';
 import type { Cheerio } from '../cheerio.js';
+import { type FragmentReceipt, insertFragmentWithParser } from '../fragment.js';
 import { update as updateDOM } from '../parse.js';
 import { text as staticText } from '../static.js';
 import type { AcceptedElems, BasicAcceptedElems } from '../types.js';
@@ -275,6 +276,77 @@ export const append: <T extends AnyNode>(
 ) => Cheerio<T> = _insert((dom, children, parent) => {
   uniqueSplice(children, children.length, 0, dom, parent);
 });
+
+/**
+ * Inserts an HTML fragment as the _last_ children of each of the selected
+ * elements, parsing the markup with the _real parse context_ of each target
+ * element (the way `innerHTML` works in browsers).
+ *
+ * Unlike {@link append}, which parses strings without any context, this makes
+ * context-sensitive targets work as expected:
+ *
+ * - Table sections produce real rows and cells, with parser-implied parents.
+ * - `select` elements accept `option` and `optgroup` children.
+ * - SVG fragments keep their SVG namespace.
+ *
+ * The ownership of every target and the legality of the insertion are checked
+ * before anything is parsed; rejected targets are left untouched and no
+ * partial tree is produced. Scripts are never executed and no browser events
+ * are simulated. The returned receipts report what was inserted, including
+ * the corrected positions of nodes the parser relocated (for example text
+ * that ended up inside parser-implied table structure).
+ *
+ * @category Manipulation
+ * @example A `<tbody>` target produces a real row:
+ *
+ * ```js
+ * const $ = cheerio.load('<table><tbody></tbody></table>');
+ * const [receipt] = $('tbody').appendFragment('<tr><td>Apple</td></tr>');
+ * receipt.ok; //=> true
+ * $('tbody').html(); //=> '<tr><td>Apple</td></tr>'
+ * ```
+ *
+ * @example A `<select>` target accepts options:
+ *
+ * ```js
+ * const $ = cheerio.load('<select></select>');
+ * $('select').appendFragment('<option value="1">One</option>');
+ * $('select').html(); //=> '<option value="1">One</option>'
+ * ```
+ *
+ * @example An SVG target keeps its namespace:
+ *
+ * ```js
+ * const $ = cheerio.load('<svg viewBox="0 0 10 10"></svg>');
+ * $('svg').appendFragment('<circle cx="5" cy="5" r="4"/>');
+ * $('svg circle').get(0).namespace; //=> 'http://www.w3.org/2000/svg'
+ * ```
+ *
+ * @param html - The markup to parse in the context of each target.
+ * @returns One receipt per target, describing the outcome of each insertion.
+ * @see {@link append} for the context-free variant.
+ */
+export function appendFragment<T extends AnyNode>(
+  this: Cheerio<T>,
+  html: string,
+): FragmentReceipt[] {
+  const receipts: FragmentReceipt[] = [];
+  const ownerDocument = this._root?.[0] ?? null;
+
+  for (let index = 0; index < this.length; index++) {
+    receipts.push(
+      insertFragmentWithParser(
+        this._parse,
+        this[index],
+        html,
+        this.options,
+        ownerDocument,
+      ),
+    );
+  }
+
+  return receipts;
+}
 
 /**
  * Inserts content as the _first_ child of each of the selected elements.

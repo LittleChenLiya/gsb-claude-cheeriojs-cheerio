@@ -1,3 +1,9 @@
+export type {
+  FragmentCorrection,
+  FragmentParser,
+  FragmentReceipt,
+  FragmentRejectionReason,
+} from './fragment.js';
 export * from './load-parse.js';
 export type {
   AnyNode,

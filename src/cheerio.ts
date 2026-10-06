@@ -97,6 +97,7 @@ export abstract class Cheerio<T> implements ArrayLike<T> {
    * @returns A document containing the `content`.
    */
   abstract _parse(
+    this: void,
     content: string | Document | AnyNode | AnyNode[] | Buffer,
     options: InternalOptions,
     isDocument: boolean,
