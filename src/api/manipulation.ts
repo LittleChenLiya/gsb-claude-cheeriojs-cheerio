@@ -831,8 +831,36 @@ export function insertBefore<T extends AnyNode>(
 }
 
 /**
+ * Recursively clears the internal `data` store of a node and all of its
+ * descendants. Siblings of the node are not affected.
+ *
+ * @private
+ * @param node - The node to clear data from.
+ */
+function clearNodeData(node: AnyNode): void {
+  /*
+   * Only elements can hold a Cheerio `data` store; e.g. text nodes use
+   * `data` for their character content and must be left alone.
+   */
+  if (isTag(node)) {
+    delete (node as { data?: Record<string, unknown> }).data;
+  }
+
+  if (hasChildren(node)) {
+    for (const child of node.children) {
+      clearNodeData(child);
+    }
+  }
+}
+
+/**
  * Removes the set of matched elements from the DOM and all their children.
  * `selector` filters the set of matched elements to be removed.
+ *
+ * By default the internal `data` of the removed nodes is kept, so that the
+ * nodes can be re-inserted later. Pass `cleanData` to also clear the `data`
+ * store of the removed elements and all of their descendants; the `data` of
+ * their siblings is left untouched.
  *
  * @category Manipulation
  * @example
@@ -847,10 +875,51 @@ export function insertBefore<T extends AnyNode>(
  * ```
  *
  * @param selector - Optional selector for elements to remove.
+ * @param cleanData - Whether to clear the internal `data` store of the removed
+ *   elements and their descendants. Defaults to `false`.
  * @returns The instance itself.
  * @see {@link https://api.jquery.com/remove/}
  */
 export function remove<T extends AnyNode>(
+  this: Cheerio<T>,
+  selector?: string,
+  cleanData = false,
+): Cheerio<T> {
+  // Filter if we have selector
+  const elems = selector ? this.filter(selector) : this;
+
+  domEach(elems, (el) => {
+    removeElement(el);
+    el.prev = el.next = el.parent = null;
+    if (cleanData) {
+      clearNodeData(el);
+    }
+  });
+
+  return this;
+}
+
+/**
+ * Removes the set of matched elements from the DOM, keeping their internal
+ * `data` store intact so that the detached nodes can be re-inserted later.
+ * `selector` filters the set of matched elements to be detached.
+ *
+ * @category Manipulation
+ * @example
+ *
+ * ```js
+ * const $pear = $('.pear').detach();
+ * $pear.data('kind', 'williams');
+ * $('ul').append($pear);
+ * $('.pear').data('kind');
+ * //=> 'williams'
+ * ```
+ *
+ * @param selector - Optional selector for elements to detach.
+ * @returns The instance itself.
+ * @see {@link https://api.jquery.com/detach/}
+ */
+export function detach<T extends AnyNode>(
   this: Cheerio<T>,
   selector?: string,
 ): Cheerio<T> {

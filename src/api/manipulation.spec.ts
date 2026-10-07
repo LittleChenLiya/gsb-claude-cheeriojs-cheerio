@@ -1533,6 +1533,95 @@ describe('$(...)', () => {
       expect($plum[0].parent).toBe(null);
       expect(root?.childNodes).not.toContain($plum[0]);
     });
+
+    it('() : should keep data by default (regression)', () => {
+      const $apple = $('.apple');
+      $apple.data('kind', 'mac');
+      $apple.remove();
+      expect($apple.data('kind')).toBe('mac');
+      $fruits.append($apple);
+      expect($('.apple').data('kind')).toBe('mac');
+    });
+
+    it('(selector, cleanData) : should clear data of removed elements and their descendants, but not siblings', () => {
+      const $list = $(
+        '<ul><li class="parent"><span class="child">c</span></li><li class="sibling">s</li></ul>',
+      );
+      const $parent = $list.find('.parent');
+      const $child = $list.find('.child');
+      const $sibling = $list.find('.sibling');
+      $parent.data('role', 'parent');
+      $child.data('role', 'child');
+      $sibling.data('role', 'sibling');
+
+      $parent.remove(undefined, true);
+
+      // Existing selections can no longer read the old data
+      expect($parent.data('role')).toBeUndefined();
+      expect($parent.data()).toEqual({});
+      expect($child.data('role')).toBeUndefined();
+      // Sibling data is untouched
+      expect($sibling.data('role')).toBe('sibling');
+      // DOM links follow the original remove behavior
+      expect($parent[0].parent).toBe(null);
+      expect($parent[0].next).toBe(null);
+      expect($parent[0].prev).toBe(null);
+      expect($sibling[0].parent).toBe($list[0]);
+      expect($sibling[0].prev).toBe(null);
+    });
+  });
+
+  describe('.detach', () => {
+    it('() : should remove selected elements from the DOM', () => {
+      $('.apple').detach();
+      expect($fruits.find('.apple')).toHaveLength(0);
+    });
+
+    it('(selector) : should detach matching selected elements', () => {
+      $('li').detach('.apple');
+      expect($fruits.find('.apple')).toHaveLength(0);
+      expect($fruits.find('.orange')).toHaveLength(1);
+    });
+
+    it('() : should keep data for re-insertion and reset DOM links', () => {
+      const $apple = $('.apple');
+      const $orange = $('.orange');
+      $apple.data('kind', 'mac');
+      $apple.detach();
+
+      // Data is preserved on the detached node
+      expect($apple.data('kind')).toBe('mac');
+      // DOM links are cleared like `.remove`
+      expect($apple[0].parent).toBe(null);
+      expect($apple[0].next).toBe(null);
+      expect($apple[0].prev).toBe(null);
+      // Former sibling now links to the next element
+      expect($orange[0].prev).toBe(null);
+      expect($orange[0].parent).toBe($fruits[0]);
+
+      // Re-insert the detached node; data comes along
+      $fruits.append($apple);
+      expect($('.apple').data('kind')).toBe('mac');
+      expect($('.apple')[0].parent).toBe($fruits[0]);
+      expect($('.apple')[0].prev).toBe($('.pear')[0]);
+      expect($('.apple')[0].next).toBe(null);
+    });
+
+    it('() : should keep descendant data for re-insertion', () => {
+      const $list = $(
+        '<ul><li class="parent"><span class="child">c</span></li></ul>',
+      );
+      const $parent = $list.find('.parent');
+      $parent.data('role', 'parent');
+      $parent.find('.child').data('role', 'child');
+
+      $parent.detach();
+      expect($parent[0].parent).toBe(null);
+
+      $list.append($parent);
+      expect($list.find('.parent').data('role')).toBe('parent');
+      expect($list.find('.child').data('role')).toBe('child');
+    });
   });
 
   describe('.replaceWith', () => {
