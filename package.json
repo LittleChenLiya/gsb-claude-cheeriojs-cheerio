@@ -98,6 +98,7 @@
     "prepublishOnly": "npm run build",
     "test": "npm run lint && npm run test:vi",
     "test:vi": "vitest run",
+    "verify:detach-data": "node --import=tsx scripts/verify-detach-data.mts",
     "update-sponsors": "tsx scripts/fetch-sponsors.mts"
   },
   "lint-staged": {

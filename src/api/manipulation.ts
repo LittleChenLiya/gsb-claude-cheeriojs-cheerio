@@ -697,7 +697,8 @@ export function insertAfter<T extends AnyNode>(
     target = this._make<AnyNode>(target);
   }
 
-  this.remove();
+  // Detaching keeps data intact; the nodes are about to be moved, not removed.
+  removeNodes(this, true);
 
   const clones: T[] = [];
 
@@ -804,7 +805,8 @@ export function insertBefore<T extends AnyNode>(
 ): Cheerio<T> {
   const targetArr = this._make<AnyNode>(target);
 
-  this.remove();
+  // Detaching keeps data intact; the nodes are about to be moved, not removed.
+  removeNodes(this, true);
 
   const clones: T[] = [];
 
@@ -831,8 +833,80 @@ export function insertBefore<T extends AnyNode>(
 }
 
 /**
+ * Options controlling whether node-associated data is kept when nodes are
+ * removed from the DOM.
+ */
+export interface RemoveOptions {
+  /**
+   * Keep the nodes' internally stored data (as set via `.data()`) so the nodes
+   * can be re-inserted later without losing it. Defaults to `false` for
+   * {@link remove}, and to `true` for {@link detach}.
+   */
+  keepData?: boolean;
+}
+
+/**
+ * Delete the internal data store of an element and of all of its descendants.
+ *
+ * Data attached to sibling nodes is left untouched. Text and comment nodes use
+ * their `data` property to store their textual content, so only tag elements
+ * (which carry the `.data()` store) are considered.
+ *
+ * @private
+ * @param el - The node whose subtree should have its data cleared.
+ */
+function clearDataSubtree(el: AnyNode): void {
+  if (isTag(el)) {
+    // The `data` field is added by the `.data()` API; see `attributes.ts`.
+    delete (el as Element & { data?: unknown }).data;
+  }
+
+  if (hasChildren(el)) {
+    for (const child of el.children) {
+      clearDataSubtree(child);
+    }
+  }
+}
+
+/**
+ * Remove a set of nodes from the DOM, optionally keeping their data.
+ *
+ * This is the shared data-flow primitive behind {@link remove} and
+ * {@link detach}: the DOM links (parent/prev/next) are always reset, while the
+ * internal data stores are only cleared when `keepData` is `false`. In that
+ * case the removed node and all of its descendants lose their data, whereas
+ * surrounding siblings keep theirs.
+ *
+ * @private
+ * @param elems - Selection of elements to remove.
+ * @param keepData - Whether to retain the nodes' data for re-insertion.
+ * @returns The selection the elements were taken from.
+ */
+function removeNodes<T extends AnyNode>(
+  elems: Cheerio<T>,
+  keepData: boolean,
+): Cheerio<T> {
+  domEach(elems, (el) => {
+    if (!keepData) {
+      clearDataSubtree(el);
+    }
+
+    removeElement(el);
+    el.prev = el.next = el.parent = null;
+  });
+
+  return elems;
+}
+
+/**
  * Removes the set of matched elements from the DOM and all their children.
  * `selector` filters the set of matched elements to be removed.
+ *
+ * By default, the internal data (as set via `.data()`) of the removed elements
+ * and of all of their descendants is cleared, mirroring
+ * {@link https://api.jquery.com/remove/ | jQuery's `.remove()`}. Data of
+ * sibling nodes is not affected. Pass `{ keepData: true }` (or use
+ * {@link detach}) to retain the data for later re-insertion.
  *
  * @category Manipulation
  * @example
@@ -847,22 +921,106 @@ export function insertBefore<T extends AnyNode>(
  * ```
  *
  * @param selector - Optional selector for elements to remove.
+ * @param options - Optional removal options.
+ * @param options.keepData - Keep the removed nodes' data for re-insertion.
  * @returns The instance itself.
  * @see {@link https://api.jquery.com/remove/}
  */
 export function remove<T extends AnyNode>(
   this: Cheerio<T>,
   selector?: string,
+  options?: RemoveOptions,
+): Cheerio<T>;
+/**
+ * Removes the set of matched elements from the DOM and all their children.
+ *
+ * @category Manipulation
+ * @example
+ *
+ * ```js
+ * $('.pear').remove({ keepData: true });
+ * ```
+ *
+ * @param options - Removal options.
+ * @param options.keepData - Keep the removed nodes' data for re-insertion.
+ * @returns The instance itself.
+ * @see {@link https://api.jquery.com/remove/}
+ */
+export function remove<T extends AnyNode>(
+  this: Cheerio<T>,
+  options: RemoveOptions,
+): Cheerio<T>;
+export function remove<T extends AnyNode>(
+  this: Cheerio<T>,
+  selectorOrOptions?: string | RemoveOptions,
+  options?: RemoveOptions,
 ): Cheerio<T> {
+  const selector =
+    typeof selectorOrOptions === 'string' ? selectorOrOptions : undefined;
+  const resolvedOptions =
+    typeof selectorOrOptions === 'object' ? selectorOrOptions : options;
   // Filter if we have selector
-  const elems = selector ? this.filter(selector) : this;
+  const elems = (selector ? this.filter(selector) : this) as Cheerio<T>;
 
-  domEach(elems, (el) => {
-    removeElement(el);
-    el.prev = el.next = el.parent = null;
-  });
+  return removeNodes(elems, resolvedOptions?.keepData ?? false);
+}
 
-  return this;
+/**
+ * Removes the set of matched elements from the DOM, retaining their internal
+ * data so they can be re-inserted later (e.g. via `.appendTo()`).
+ *
+ * As with {@link remove}, `selector` filters the set of matched elements to be
+ * detached. The detached nodes' DOM links (`parent`, `prev`, `next`) are reset;
+ * data of the nodes and their descendants is preserved, while siblings keep
+ * both their links and their data.
+ *
+ * @category Manipulation
+ * @example
+ *
+ * ```js
+ * const pear = $('.pear').data('kind', 'pear').detach();
+ * pear.appendTo('#fruits');
+ * pear.data('kind');
+ * //=> 'pear'
+ * ```
+ *
+ * @param selector - Optional selector for elements to detach.
+ * @param options - Optional removal options.
+ * @param options.keepData - Set to `false` to clear the detached nodes' data.
+ * @returns The instance itself.
+ * @see {@link https://api.jquery.com/detach/}
+ */
+export function detach<T extends AnyNode>(
+  this: Cheerio<T>,
+  selector?: string,
+  options?: RemoveOptions,
+): Cheerio<T>;
+/**
+ * Removes the set of matched elements from the DOM, retaining their data.
+ *
+ * @category Manipulation
+ * @param options - Removal options.
+ * @param options.keepData - Set to `false` to clear the detached nodes' data.
+ * @returns The instance itself.
+ * @see {@link https://api.jquery.com/detach/}
+ */
+export function detach<T extends AnyNode>(
+  this: Cheerio<T>,
+  options: RemoveOptions,
+): Cheerio<T>;
+export function detach<T extends AnyNode>(
+  this: Cheerio<T>,
+  selectorOrOptions?: string | RemoveOptions,
+  options?: RemoveOptions,
+): Cheerio<T> {
+  const selector =
+    typeof selectorOrOptions === 'string' ? selectorOrOptions : undefined;
+  const resolvedOptions =
+    typeof selectorOrOptions === 'object' ? selectorOrOptions : options;
+  // Filter if we have selector
+  const elems = (selector ? this.filter(selector) : this) as Cheerio<T>;
+
+  return removeNodes(elems, resolvedOptions?.keepData ?? true);
 }
 
 /**

@@ -1533,6 +1533,140 @@ describe('$(...)', () => {
       expect($plum[0].parent).toBe(null);
       expect(root?.childNodes).not.toContain($plum[0]);
     });
+
+    it('() : should clear the data of removed nodes and descendants, but not of siblings', () => {
+      const $orange = $('.orange').data('taste', 'citrus');
+      const $pear = $('.pear').data('taste', 'sweet');
+
+      // Give `.orange` a tagged descendant with data of its own.
+      const $child = $('<b class="leaf">leaf</b>').data('role', 'descendant');
+      $orange.append($child);
+
+      $('.orange').remove();
+
+      // Existing selections of removed nodes cannot read the old data ...
+      expect($orange.data('taste')).toBeUndefined();
+      // ... nor can descendants carried away with the subtree.
+      expect($child.data('role')).toBeUndefined();
+      // The cleared values are gone, not just hidden.
+      expect(($orange[0] as { data?: Record<string, unknown> }).data).toEqual(
+        {},
+      );
+      expect(($child[0] as { data?: Record<string, unknown> }).data).toEqual(
+        {},
+      );
+
+      // Siblings keep their own data.
+      expect($('.apple').data('taste')).toBeUndefined();
+      expect($pear.data('taste')).toBe('sweet');
+
+      // DOM links: removed node is detached, siblings are re-linked.
+      expect($orange[0].parent).toBeNull();
+      expect($orange[0].prev).toBeNull();
+      expect($orange[0].next).toBeNull();
+      expect($('.apple')[0].next).toBe($('.pear')[0]);
+      expect($('.pear')[0].prev).toBe($('.apple')[0]);
+    });
+
+    it('({ keepData: true }) : should retain data for later re-insertion', () => {
+      const $pear = $('.pear')
+        .data('taste', 'sweet')
+        .remove({ keepData: true });
+
+      expect($pear.data('taste')).toBe('sweet');
+
+      $pear.appendTo($fruits);
+      expect($pear.data('taste')).toBe('sweet');
+      expect($pear[0].prev).toBe($('.orange')[0]);
+      expect($('.orange')[0].next).toBe($pear[0]);
+      expect($pear[0].parent).toBe($fruits[0]);
+    });
+  });
+
+  describe('.detach', () => {
+    it('() : should remove selected elements while keeping their data', () => {
+      const $pear = $('.pear').data('taste', 'sweet');
+
+      $pear.detach();
+
+      expect($fruits.find('.pear')).toHaveLength(0);
+      // Detached nodes keep their data for re-insertion ...
+      expect($pear.data('taste')).toBe('sweet');
+      // ... but DOM links are reset just like `.remove()`.
+      expect($pear[0].parent).toBeNull();
+      expect($pear[0].prev).toBeNull();
+      expect($pear[0].next).toBeNull();
+
+      $pear.appendTo($fruits);
+
+      expect($pear.data('taste')).toBe('sweet');
+      expect($pear[0].parent).toBe($fruits[0]);
+      expect($('.orange')[0].next).toBe($pear[0]);
+      expect($pear[0].prev).toBe($('.orange')[0]);
+    });
+
+    it('(selector) : should only detach matching selected elements', () => {
+      const $items = $('li').data('taste', 'fruity');
+      const $apple = $items.filter('.apple');
+
+      $items.detach('.apple');
+
+      expect($fruits.find('.apple')).toHaveLength(0);
+      // Existing selection still holds the detached node and its data.
+      expect($apple.data('taste')).toBe('fruity');
+      expect($fruits.find('.orange')).toHaveLength(1);
+      expect($fruits.find('.pear')).toHaveLength(1);
+    });
+
+    it('({ keepData: false }) : should clear data like `.remove()`', () => {
+      const $apple = $('.apple').data('taste', 'sweet');
+      const $child = $('<em>core</em>').data('role', 'descendant');
+      $apple.append($child);
+
+      $apple.detach({ keepData: false });
+
+      expect($apple.data('taste')).toBeUndefined();
+      expect($child.data('role')).toBeUndefined();
+      expect($('.orange')[0].prev).toBeNull();
+      expect($('.orange')[0].next).toBe($('.pear')[0]);
+    });
+
+    it('() : should preserve descendant data without touching siblings', () => {
+      /*
+       * Parent/child data nodes: detach the parent, re-insert it, and verify
+       * data, sibling values, and parent/next links all line up.
+       */
+      const $apple = $('.apple').data('taste', 'sweet');
+      const $leaf = $('<span class="leaf">leaf</span>').data(
+        'role',
+        'descendant',
+      );
+      $apple.append($leaf);
+      const $orange = $('.orange').data('taste', 'citrus');
+
+      const detached = $apple.detach();
+
+      expect(detached.data('taste')).toBe('sweet');
+      expect($leaf.data('role')).toBe('descendant');
+      expect($orange.data('taste')).toBe('citrus');
+      expect($fruits.children()).toHaveLength(2);
+      expect($orange[0].prev).toBeNull();
+      expect($('.pear')[0].prev).toBe($orange[0]);
+
+      detached.appendTo($fruits);
+
+      // Appending re-inserts at the end: orange, pear, apple(detached).
+      const $pear = $fruits.children().eq(1);
+      expect(detached.data('taste')).toBe('sweet');
+      expect($leaf.data('role')).toBe('descendant');
+      expect($orange.data('taste')).toBe('citrus');
+      expect($fruits.children()).toHaveLength(3);
+      expect(detached[0].parent).toBe($fruits[0]);
+      expect($pear[0].next).toBe(detached[0]);
+      expect(detached[0].prev).toBe($pear[0]);
+      expect(detached[0].next).toBeNull();
+      expect($orange[0].next).toBe($pear[0]);
+    });
   });
 
   describe('.replaceWith', () => {

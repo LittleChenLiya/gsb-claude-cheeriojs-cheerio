@@ -225,6 +225,21 @@ in the selection, and all of their children, from the document.
 $('li').remove();
 ```
 
+When an element is removed, the internal data of the element and of its
+descendants (the values stored via
+[`data()`](/docs/api/classes/Cheerio#data)) is cleared as well; data on
+surrounding siblings is left untouched. To remove an element but keep its data
+— for example, because you plan to re-insert it later — use
+[`detach()`](/docs/api/classes/Cheerio#detach), or pass `{ keepData: true }` to
+`remove()`:
+
+```js
+// Detach the element, move it, and keep its data
+const pear = $('.pear').data('kind', 'pear').detach();
+pear.appendTo('#fruits');
+pear.data('kind'); // 'pear'
+```
+
 To clear an element without removing it, use
 [`empty()`](/docs/api/classes/Cheerio#empty). It removes everything inside each
 element in the selection — child elements, text, and comments alike — leaving
